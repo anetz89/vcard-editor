@@ -1,0 +1,8 @@
+BEGIN:VCARD
+VERSION:4.0
+FN:Simon Perreault
+N:Perreault;Simon;;;ing. jr,M.Sc.
+BDAY:1989-02-03
+GENDER:M
+EMAIL;TYPE=work:simon.perreault@viagenie.ca
+END:VCARD
