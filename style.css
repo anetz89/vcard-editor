@@ -1,0 +1,12 @@
+.active {
+    font-weight: bold;
+}
+.nav-item {
+    cursor: pointer;
+    margin: 0 5px;
+}
+#navigation {
+    text-align:center;
+    background-color:#eee;
+    border-radius: 0.5em;
+}

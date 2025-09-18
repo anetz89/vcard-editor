@@ -21,10 +21,11 @@ const VALUE_PATTERNS = {
 };
 const VALID_KEYS = /^(BEGIN|END|SOURCE|KIND|XML|FN|N|NICKNAME|PHOTO|BDAY|ANNIVERSARY|GENDER|ADR|TEL|EMAIL|IMPP|LANG|TZ|GEO|TITLE|ROLE|LOGO|ORG|MEMBER|RELATED|CATEGORIES|NOTE|PRODID|REV|SOUND|UID|CLIENTPIDMAP|URL|VERSION|KEY|FBURL|CALADRURI|CALURI)(;(.*=.*\,?)*)?$/;
 
-let vCardDataModel = {}; // Internal data model to store vCard data
+let vCardDataModel = []; // Internal data model to store vCard data
+let currentPage;
 
 // for debug purpose to avoid data upload every time
-displayVCard("BEGIN:VCARD\nVERSION:3.0\nFN:John Doe\nN:Doe;John;;;\nTEL;TYPE=WORK,VOICE:+1234567890\nTEL;TYPE=HOME,VOICE:+0987654321\nEMAIL:john.doe@example.com\nEND:VCARD");
+displayVCard("BEGIN:VCARD\nVERSION:3.0\nFN:John Doe\nN:Doe;John;;;\nTEL;TYPE=WORK,VOICE:+1234567890\nTEL;TYPE=HOME,VOICE:+0987654321\nEMAIL:john.doe@example.com\nEND:VCARD\n\nBEGIN:VCARD\nVERSION:3.0\nFN:John Zwo\nN:Zwo;John;;;\nTEL;TYPE=WORK,VOICE:+1234567890\nTEL;TYPE=HOME,VOICE:+0987654321\nEMAIL:john.doe@example.com\nEND:VCARD");
 
 function onFileSelected(event) {
     const file = event.target.files[0];
@@ -41,19 +42,53 @@ function onFileSelected(event) {
 function displayVCard(vCardData) {
     VCARD.innerHTML = '';
 
+    // Initialize the internal data model
+    vCardDataModel = [];
+
+    const vCardEntity = vCardData.split('\n\n');
+
+    vCardEntity.forEach(parseEntity);
+
+    if(vCardDataModel.length) {
+        currentPage = 1;
+
+        renderContent();
+        renderNavigation();
+
+        VCARD.classList.remove('hidden');
+        DOWNLOADBTN.classList.remove('hidden');
+
+        // Validate all inputs after displaying the vCard
+        onInputChanged()
+    }
+}
+
+function displayNavigation() {
+    vCardDataModel.length
+}
+
+function parseEntity(vCardData, index) {
     const lines = vCardData.split('\n');
     const table = document.createElement('table');
+    const vCardDataEntry = {
+        metadata: {
+            version: null,
+            index: index
+        },
+        data: {},
+        domelement: table
+    };
     table.className = 'table table-bordered';
-
-    // Initialize the internal data model
-    vCardDataModel = {};
 
     lines.forEach(line => {
         const [key, ...valueParts] = line.split(':');
         const value = valueParts.join(':');
 
-        if (line.startsWith('BEGIN') || line.startsWith('END') || line.startsWith('VERSION')) {
-            return; // Do not display lines
+        if (line === '' || line.startsWith('BEGIN') || line.startsWith('END')) { return; } // Do not display lines
+
+        if (line.startsWith('VERSION')) {
+            vCardDataEntry.metadata.version = value;
+            return;
         }
 
         if (!VALID_KEYS.test(key)) {
@@ -62,7 +97,7 @@ function displayVCard(vCardData) {
         }
 
         // Store the key-value pair in the internal data model
-        vCardDataModel[key] = value;
+        vCardDataEntry.data[key] = value;
 
         const row = document.createElement('tr');
 
@@ -82,19 +117,13 @@ function displayVCard(vCardData) {
 
         // Add real-time validation and update the internal data model on input change
         input.addEventListener('input', function() {
-            vCardDataModel[key] = input.value; // Update the internal data model
+            vCardDataModel[index].data[key] = input.value; // Update the internal data model
             onInputChanged();
         });
 
         table.appendChild(row);
     });
-
-    VCARD.appendChild(table);
-    VCARD.classList.remove('hidden');
-    DOWNLOADBTN.classList.remove('hidden');
-
-    // Validate all inputs after displaying the vCard
-    onInputChanged()
+    vCardDataModel.push(vCardDataEntry);
 }
 
 function onInputChanged() {
@@ -134,16 +163,21 @@ function validateAllInputs() {
 function downloadVCard() {
     const version = document.getElementById('vcardVersion').value;
 
+    const vCardData = [];
+
     // prepare data
-    const vCardData = [
-        'BEGIN:VCARD',
-        `VERSION:${version}`,
-        ...Object.entries(prepare(vCardDataModel, version)).map(([key, value]) => `${key}:${value}`),
-        'END:VCARD'
-    ].join('\n');
+    vCardDataModel.forEach(entity => {
+        vCardData.push(...[
+            'BEGIN:VCARD',
+            `VERSION:${version}`,
+            ...Object.entries(prepare(entity.data, version)).map(([key, value]) => `${key}:${value}`),
+            'END:VCARD',
+            ''
+        ]);
+    });
 
     // logic to trigger download
-    const blob = new Blob([vCardData], { type: 'text/vcard' });
+    const blob = new Blob([vCardData.join('\n')], { type: 'text/vcard' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -187,4 +221,67 @@ function prepare(dataModel, version) {
     });
 
     return model;
+}
+
+
+
+function renderContent() {
+    VCARD.innerHTML = '';
+    VCARD.append(vCardDataModel[currentPage - 1].domelement);
+    validateAllInputs();
+}
+
+function renderNavigationItem(i) {
+    const navItem = document.createElement('span');
+    navItem.className = 'nav-item' + (i === currentPage ? ' active' : '');
+    
+    switch(i){
+        case 0:
+            navItem.textContent = '<';
+            break;
+        case vCardDataModel.length + 1:
+            navItem.textContent = '>';
+            break;
+        default:
+            navItem.textContent = i;
+            break;
+    }
+
+    navItem.onclick = () => {
+        switch(i){
+            case 0:
+                currentPage = (currentPage > 1)? currentPage - 1: currentPage;
+                break;
+            case vCardDataModel.length + 1:
+                currentPage = (currentPage < vCardDataModel.length)? currentPage + 1: currentPage;
+                break;
+            default:
+                currentPage = i;
+                break;
+        }
+        renderContent();
+        renderNavigation();
+    };
+    return navItem;
+}
+
+function renderNavigation() {
+    const navigationDiv = document.getElementById('navigation');
+    navigationDiv.innerHTML = '';
+
+    const totalPages = vCardDataModel.length;
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+
+    navigationDiv.appendChild(renderNavigationItem(0));
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= startPage && i <= endPage)) {
+            navigationDiv.appendChild(renderNavigationItem(i));
+        } else if (i === startPage - 1 || i === endPage + 1) {
+            const ellipsis = document.createElement('span');
+            ellipsis.textContent = '...';
+            navigationDiv.appendChild(ellipsis);
+        }
+    }
+    navigationDiv.appendChild(renderNavigationItem(totalPages + 1));
 }
