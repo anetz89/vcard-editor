@@ -3,7 +3,7 @@ const VCARD = document.getElementById('vcardContent');
 DOWNLOADBTN.addEventListener('click', downloadVCard);
 document.getElementById('fileInput').addEventListener('change', onFileSelected);
 
-const valuePatterns = {
+const VALUE_PATTERNS = {
     'FN': /^[\w\s.,'-]+$/, // Full Name
     'N': /^[\w\s.,'-]+;[\w\s.,'-]+;[\w\s.,'-]*;[\w\s.,'-]*;[\w\s.,'-]*$/, // Name
     'EMAIL': /^[\w._%+-]+@[\w.-]+\.[a-zA-Z]{2,}$/, // Email
@@ -19,8 +19,12 @@ const valuePatterns = {
     'X-ABLABEL': /^[\w\s.,'-]+$/, // Custom label
     // Add more fields as needed
 };
+const VALID_KEYS = /^(BEGIN|END|SOURCE|KIND|XML|FN|N|NICKNAME|PHOTO|BDAY|ANNIVERSARY|GENDER|ADR|TEL|EMAIL|IMPP|LANG|TZ|GEO|TITLE|ROLE|LOGO|ORG|MEMBER|RELATED|CATEGORIES|NOTE|PRODID|REV|SOUND|UID|CLIENTPIDMAP|URL|VERSION|KEY|FBURL|CALADRURI|CALURI)(;(.*=.*\,?)*)?$/;
 
 let vCardDataModel = {}; // Internal data model to store vCard data
+
+// for debug purpose to avoid data upload every time
+displayVCard("BEGIN:VCARD\nVERSION:3.0\nFN:John Doe\nN:Doe;John;;;\nTEL;TYPE=WORK,VOICE:+1234567890\nTEL;TYPE=HOME,VOICE:+0987654321\nEMAIL:john.doe@example.com\nEND:VCARD");
 
 function onFileSelected(event) {
     const file = event.target.files[0];
@@ -52,6 +56,11 @@ function displayVCard(vCardData) {
             return; // Do not display lines
         }
 
+        if (!VALID_KEYS.test(key)) {
+            alert(`invalid key: ${key}`);
+            return; // Do not display invalid keys
+        }
+
         // Store the key-value pair in the internal data model
         vCardDataModel[key] = value;
 
@@ -59,7 +68,7 @@ function displayVCard(vCardData) {
 
         const labelCell = document.createElement('td');
         labelCell.className = 'table-label font-weight-bold';
-        labelCell.textContent = key + ':';
+        labelCell.textContent = key;
         row.appendChild(labelCell);
 
         const inputCell = document.createElement('td');
@@ -97,7 +106,7 @@ function onInputChanged() {
 }
 
 function validateInput(key, value) {
-    const pattern = valuePatterns[key] || /.*/; // Default to allow any value if no specific pattern
+    const pattern = VALUE_PATTERNS[key] || /.*/; // Default to allow any value if no specific pattern
     return pattern.test(value);
 }
 
@@ -108,7 +117,7 @@ function validateAllInputs() {
     Array.from(inputs).forEach(input => {
         const key = input.getAttribute('data-key');
         const value = input.value;
-
+        
         if (validateInput(key, value)) {
             input.classList.remove('is-invalid');
             input.classList.add('is-valid');
@@ -172,7 +181,7 @@ function prepare(dataModel, version) {
         default: alert('unknown version');
     }
 
-    // remove keys that are not valid for the current function
+    // remove keys that are not valid for the current version
     keysToDelete[version].forEach(key => {
         delete model[key];
     });
